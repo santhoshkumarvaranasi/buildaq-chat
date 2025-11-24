@@ -69,6 +69,27 @@
         <span>Encrypted export (paste to import)</span>
         <textarea id="exportBox" rows="3" placeholder="Encrypted payload you can copy between browsers"></textarea>
       </label>
+
+      <div class="divider"></div>
+      <div class="panel__head">
+        <div>
+          <p class="eyebrow">Relay</p>
+          <h2>Connect to WebSocket fan-out.</h2>
+        </div>
+        <span id="relayStatus" class="badge badge--ghost">Disconnected</span>
+      </div>
+      <label class="field">
+        <span>Relay URL</span>
+        <input id="relayUrl" type="url" placeholder="wss://your-relay.example.com">
+      </label>
+      <label class="field">
+        <span>Room</span>
+        <input id="roomInput" type="text" placeholder="team-room" autocomplete="off">
+      </label>
+      <div class="stack">
+        <button id="connectButton" class="primary-btn primary-btn--ghost" type="button">Connect</button>
+        <button id="disconnectButton" class="secondary-btn secondary-btn--ghost" type="button">Disconnect</button>
+      </div>
     </section>
   </main>
 

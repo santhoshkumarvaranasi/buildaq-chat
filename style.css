@@ -373,3 +373,9 @@ button {
   background: rgba(122, 240, 201, 0.12);
   border: 1px solid rgba(122, 240, 201, 0.25);
 }
+
+.badge--ghost {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}

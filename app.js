@@ -20,12 +20,23 @@
   const demoButton = document.getElementById('demoButton');
   const exportButton = document.getElementById('exportButton');
   const exportBox = document.getElementById('exportBox');
+  const relayStatus = document.getElementById('relayStatus');
+  const relayUrlInput = document.getElementById('relayUrl');
+  const roomInput = document.getElementById('roomInput');
+  const connectButton = document.getElementById('connectButton');
+  const disconnectButton = document.getElementById('disconnectButton');
 
   const heroMessages = [
     'All messages are locked until you and your partner share the same code.',
     'Codes never leave your browser. Change them anytime.',
     'Use the demo button to see how a locked message looks.'
   ];
+
+  const RELAY_KEY = 'buildaq-chat:relay';
+  let ws = null;
+  let shouldReconnect = false;
+  let reconnectTimer = null;
+  let reconnectAttempts = 0;
 
   function uid() {
     return typeof crypto.randomUUID === 'function'
@@ -103,6 +114,30 @@
     }
   }
 
+  function saveRelayConfig() {
+    try {
+      localStorage.setItem(
+        RELAY_KEY,
+        JSON.stringify({ relayUrl: relayUrlInput.value.trim(), room: roomInput.value.trim() })
+      );
+    } catch (err) {
+      console.warn('Unable to save relay config', err);
+    }
+  }
+
+  function loadRelayConfig() {
+    try {
+      const raw = localStorage.getItem(RELAY_KEY);
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        relayUrlInput.value = cfg.relayUrl || '';
+        roomInput.value = cfg.room || '';
+      }
+    } catch (err) {
+      console.warn('Unable to load relay config', err);
+    }
+  }
+
   async function seedDemo() {
     if (state.messages.length) return;
     const intro = `This demo message is encrypted. Use code "buildaq-demo" to unlock it.\n\n` +
@@ -124,6 +159,11 @@
     codeInput.value = '';
     updateLockUI(reasonText);
     renderMessages();
+  }
+
+  function updateRelayStatus(label, variant = 'ghost') {
+    relayStatus.textContent = label;
+    relayStatus.className = `badge badge--${variant}`;
   }
 
   function fmtTime(iso) {
@@ -191,6 +231,7 @@
 
     const encrypted = await encryptMessage(text, code, 'You');
     state.messages.push(encrypted);
+    sendToRelay(encrypted);
     messageInput.value = '';
     save();
     renderMessages();
@@ -203,6 +244,97 @@
     state.messages.push(encrypted);
     save();
     renderMessages();
+  }
+
+  function hasMessage(id) {
+    return state.messages.some((m) => m.id === id);
+  }
+
+  async function handleIncoming(payload) {
+    const required = ['id', 'sender', 'at', 'ciphertext', 'iv', 'salt'];
+    if (!payload || required.some((k) => !payload[k])) return;
+    if (hasMessage(payload.id)) return;
+    state.messages.push(payload);
+    save();
+    renderMessages();
+  }
+
+  function sendToRelay(entry) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const room = roomInput.value.trim();
+    if (!room) return;
+    ws.send(JSON.stringify({ room, ...entry }));
+  }
+
+  function scheduleReconnect() {
+    if (!shouldReconnect) return;
+    const delay = Math.min(30000, 1000 * 2 ** Math.min(reconnectAttempts, 5));
+    reconnectAttempts += 1;
+    updateRelayStatus(`Reconnecting in ${Math.round(delay / 1000)}s`, 'ghost');
+    reconnectTimer = setTimeout(connectRelay, delay);
+  }
+
+  function disconnectRelay() {
+    shouldReconnect = false;
+    reconnectAttempts = 0;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    updateRelayStatus('Disconnected', 'ghost');
+  }
+
+  function connectRelay() {
+    const relayUrl = relayUrlInput.value.trim().replace(/\/+$/, '');
+    const room = roomInput.value.trim();
+    if (!relayUrl || !room) {
+      updateRelayStatus('Enter relay URL + room', 'ghost');
+      return;
+    }
+    shouldReconnect = true;
+    reconnectAttempts = 0;
+    saveRelayConfig();
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) ws.close();
+
+    let target;
+    try {
+      target = `${relayUrl}/?room=${encodeURIComponent(room)}`;
+    } catch (err) {
+      updateRelayStatus('Invalid relay URL', 'danger');
+      return;
+    }
+
+    updateRelayStatus('Connecting…', 'ghost');
+    ws = new WebSocket(target);
+
+    ws.addEventListener('open', () => {
+      updateRelayStatus('Connected', 'ok');
+      reconnectAttempts = 0;
+    });
+
+    ws.addEventListener('message', async (event) => {
+      if (typeof event.data !== 'string') return;
+      try {
+        const parsed = JSON.parse(event.data);
+        await handleIncoming(parsed);
+      } catch (err) {
+        console.warn('Bad relay payload', err);
+      }
+    });
+
+    ws.addEventListener('close', (evt) => {
+      updateRelayStatus('Disconnected', 'ghost');
+      ws = null;
+      if (shouldReconnect && evt.code !== 1000) scheduleReconnect();
+    });
+
+    ws.addEventListener('error', () => {
+      updateRelayStatus('Relay error', 'danger');
+      ws = null;
+      scheduleReconnect();
+    });
   }
 
   function updateExportBox(show = true) {
@@ -259,6 +391,11 @@
     exportButton.addEventListener('click', () => updateExportBox(true));
     exportBox.addEventListener('change', importFromBox);
 
+    connectButton.addEventListener('click', connectRelay);
+    disconnectButton.addEventListener('click', disconnectRelay);
+    relayUrlInput.addEventListener('change', saveRelayConfig);
+    roomInput.addEventListener('change', saveRelayConfig);
+
     // Auto re-lock when tab loses focus or visibility to keep plaintext from lingering.
     window.addEventListener('blur', () => relock('Locked after focus left'));
     document.addEventListener('visibilitychange', () => {
@@ -268,6 +405,7 @@
 
   async function init() {
     load();
+    loadRelayConfig();
     await seedDemo();
     wireEvents();
     updateLockUI();
