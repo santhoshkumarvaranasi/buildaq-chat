@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BuildaQ Cipher Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-accent"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__dot"></div>
+      <div>
+        <p class="eyebrow">buildaq / chat.buildaq.com</p>
+        <h1>End-to-end chat. Locked by default.</h1>
+      </div>
+    </div>
+    <div class="lock-state" id="lockState">
+      <span class="lock-state__icon" aria-hidden="true">🔒</span>
+      <span class="lock-state__label" id="lockLabel">Locked · enter the code</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel panel--messages">
+      <div class="panel__head">
+        <div>
+          <p class="eyebrow">Conversation</p>
+          <h2>Messages stay encrypted at rest.</h2>
+        </div>
+        <button class="ghost-btn" id="clearButton" type="button">Clear local history</button>
+      </div>
+      <div id="messageList" class="messages" aria-live="polite"></div>
+      <form id="composer" class="composer">
+        <label class="field">
+          <span>New message</span>
+          <textarea id="messageInput" name="message" rows="3" placeholder="Type, then encrypt with your shared code" required></textarea>
+        </label>
+        <div class="composer__footer">
+          <div class="hint">Messages are stored encrypted in your browser until you provide the shared code.</div>
+          <button type="submit" class="primary-btn">Encrypt &amp; send</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel panel--controls">
+      <div class="panel__head">
+        <div>
+          <p class="eyebrow">Unlock</p>
+          <h2>Enter the shared code to decrypt.</h2>
+        </div>
+      </div>
+      <label class="field">
+        <span>Shared code</span>
+        <input id="codeInput" type="password" inputmode="text" autocomplete="one-time-code" placeholder="e.g. river-otter-410" required>
+      </label>
+      <button id="setCodeButton" class="primary-btn primary-btn--ghost" type="button">Set code</button>
+      <p class="hint">Share this code out-of-band. Without it, messages remain ciphertext.</p>
+      <div class="divider"></div>
+      <div class="stack">
+        <button id="demoButton" class="secondary-btn" type="button">Add encrypted demo message</button>
+        <button id="exportButton" class="secondary-btn secondary-btn--ghost" type="button">Export encrypted log</button>
+      </div>
+      <label class="field">
+        <span>Encrypted export (paste to import)</span>
+        <textarea id="exportBox" rows="3" placeholder="Encrypted payload you can copy between browsers"></textarea>
+      </label>
+    </section>
+  </main>
+
+  <template id="messageTemplate">
+    <article class="bubble">
+      <div class="bubble__meta">
+        <span class="bubble__author"></span>
+        <span class="bubble__time"></span>
+      </div>
+      <div class="bubble__body"></div>
+      <div class="bubble__cipher"></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
