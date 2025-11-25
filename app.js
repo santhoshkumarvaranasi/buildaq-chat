@@ -288,10 +288,10 @@
   }
 
   async function connectRelay() {
-    const relayUrl = relayUrlInput.value.trim().replace(/\/+$/, '') || window.location.origin;
+    const relayUrl = relayUrlInput.value.trim().replace(/\/+$/, '');
     const room = roomInput.value.trim();
-    if (!room) {
-      updateRelayStatus('Enter room', 'ghost');
+    if (!relayUrl || !room) {
+      updateRelayStatus('Enter relay URL and room', 'ghost');
       return;
     }
     shouldReconnect = true;
@@ -305,8 +305,9 @@
 
     updateRelayStatus('Connecting…', 'ghost');
     signalRConn = new signalR.HubConnectionBuilder()
-      .withUrl(`${relayUrl}/relay?room=${encodeURIComponent(room)}`)
+      .withUrl(`${relayUrl}/relay?room=${encodeURIComponent(room)}`, { withCredentials: false })
       .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Information)
       .build();
 
     signalRConn.on('message', async (payload) => {
