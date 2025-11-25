@@ -33,7 +33,7 @@
   ];
 
   const RELAY_KEY = 'buildaq-chat:relay';
-  let ws = null;
+  let signalRConn = null;
   let shouldReconnect = false;
   let reconnectTimer = null;
   let reconnectAttempts = 0;
@@ -260,10 +260,12 @@
   }
 
   function sendToRelay(entry) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!signalRConn || signalRConn.state !== signalR.HubConnectionState.Connected) return;
     const room = roomInput.value.trim();
     if (!room) return;
-    ws.send(JSON.stringify({ room, ...entry }));
+    signalRConn.invoke('SendToRoom', { room, ...entry }).catch((err) => {
+      console.warn('Relay send failed', err);
+    });
   }
 
   function scheduleReconnect() {
@@ -278,63 +280,57 @@
     shouldReconnect = false;
     reconnectAttempts = 0;
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    if (ws) {
-      ws.close();
-      ws = null;
+    if (signalRConn) {
+      signalRConn.stop();
+      signalRConn = null;
     }
     updateRelayStatus('Disconnected', 'ghost');
   }
 
-  function connectRelay() {
-    const relayUrl = relayUrlInput.value.trim().replace(/\/+$/, '');
+  async function connectRelay() {
+    const relayUrl = relayUrlInput.value.trim().replace(/\/+$/, '') || window.location.origin;
     const room = roomInput.value.trim();
-    if (!relayUrl || !room) {
-      updateRelayStatus('Enter relay URL + room', 'ghost');
+    if (!room) {
+      updateRelayStatus('Enter room', 'ghost');
       return;
     }
     shouldReconnect = true;
     reconnectAttempts = 0;
     saveRelayConfig();
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    if (ws) ws.close();
-
-    let target;
-    try {
-      target = `${relayUrl}/?room=${encodeURIComponent(room)}`;
-    } catch (err) {
-      updateRelayStatus('Invalid relay URL', 'danger');
-      return;
+    if (signalRConn) {
+      await signalRConn.stop().catch(() => {});
+      signalRConn = null;
     }
 
     updateRelayStatus('Connecting…', 'ghost');
-    ws = new WebSocket(target);
+    signalRConn = new signalR.HubConnectionBuilder()
+      .withUrl(`${relayUrl}/relay?room=${encodeURIComponent(room)}`)
+      .withAutomaticReconnect()
+      .build();
 
-    ws.addEventListener('open', () => {
-      updateRelayStatus('Connected', 'ok');
+    signalRConn.on('message', async (payload) => {
+      await handleIncoming(payload);
+    });
+
+    signalRConn.onreconnecting(() => updateRelayStatus('Reconnecting…', 'ghost'));
+    signalRConn.onreconnected(() => {
       reconnectAttempts = 0;
+      updateRelayStatus('Connected', 'ok');
     });
-
-    ws.addEventListener('message', async (event) => {
-      if (typeof event.data !== 'string') return;
-      try {
-        const parsed = JSON.parse(event.data);
-        await handleIncoming(parsed);
-      } catch (err) {
-        console.warn('Bad relay payload', err);
-      }
-    });
-
-    ws.addEventListener('close', (evt) => {
+    signalRConn.onclose(() => {
       updateRelayStatus('Disconnected', 'ghost');
-      ws = null;
-      if (shouldReconnect && evt.code !== 1000) scheduleReconnect();
+      if (shouldReconnect) scheduleReconnect();
     });
 
-    ws.addEventListener('error', () => {
+    try {
+      await signalRConn.start();
+      updateRelayStatus('Connected', 'ok');
+    } catch (err) {
+      console.warn('SignalR connect failed', err);
       updateRelayStatus('Relay error', 'danger');
-      ws = null;
       scheduleReconnect();
-    });
+    }
   }
 
   function updateExportBox(show = true) {
