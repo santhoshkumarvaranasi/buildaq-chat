@@ -21,7 +21,6 @@
   const exportButton = document.getElementById('exportButton');
   const exportBox = document.getElementById('exportBox');
   const relayStatus = document.getElementById('relayStatus');
-  const relayUrlInput = document.getElementById('relayUrl');
   const roomInput = document.getElementById('roomInput');
   const connectButton = document.getElementById('connectButton');
   const disconnectButton = document.getElementById('disconnectButton');
@@ -33,6 +32,7 @@
   ];
 
   const RELAY_KEY = 'buildaq-chat:relay';
+  const DEFAULT_RELAY_URL = 'https://relay.chat.buildaq.com';
   let signalRConn = null;
   let shouldReconnect = false;
   let reconnectTimer = null;
@@ -116,10 +116,7 @@
 
   function saveRelayConfig() {
     try {
-      localStorage.setItem(
-        RELAY_KEY,
-        JSON.stringify({ relayUrl: relayUrlInput.value.trim(), room: roomInput.value.trim() })
-      );
+      localStorage.setItem(RELAY_KEY, JSON.stringify({ room: roomInput.value.trim() }));
     } catch (err) {
       console.warn('Unable to save relay config', err);
     }
@@ -130,7 +127,6 @@
       const raw = localStorage.getItem(RELAY_KEY);
       if (raw) {
         const cfg = JSON.parse(raw);
-        relayUrlInput.value = cfg.relayUrl || '';
         roomInput.value = cfg.room || '';
       }
     } catch (err) {
@@ -288,10 +284,10 @@
   }
 
   async function connectRelay() {
-    const relayUrl = relayUrlInput.value.trim().replace(/\/+$/, '');
+    const relayUrl = DEFAULT_RELAY_URL.replace(/\/+$/, '');
     const room = roomInput.value.trim();
     if (!relayUrl || !room) {
-      updateRelayStatus('Enter relay URL and room', 'ghost');
+      updateRelayStatus('Enter room', 'ghost');
       return;
     }
     shouldReconnect = true;
@@ -390,7 +386,6 @@
 
     connectButton.addEventListener('click', connectRelay);
     disconnectButton.addEventListener('click', disconnectRelay);
-    relayUrlInput.addEventListener('change', saveRelayConfig);
     roomInput.addEventListener('change', saveRelayConfig);
 
     // Auto re-lock when tab loses focus or visibility to keep plaintext from lingering.
