@@ -192,7 +192,12 @@
       const cipher = node.querySelector('.bubble__cipher');
 
       let unlocked = false;
-      const displaySender = localSentIds.has(entry.id) ? 'You' : (entry.sender || 'Peer');
+      const isLocal = localSentIds.has(entry.id);
+      const displaySender = isLocal
+        ? 'You'
+        : entry.sender === 'You'
+          ? 'Peer'
+          : (entry.sender || 'Peer');
       metaAuthor.textContent = displaySender;
       metaTime.textContent = fmtTime(entry.at);
 
