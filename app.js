@@ -37,6 +37,7 @@
   let shouldReconnect = false;
   let reconnectTimer = null;
   let reconnectAttempts = 0;
+  const localSentIds = new Set();
 
   function uid() {
     return typeof crypto.randomUUID === 'function'
@@ -191,7 +192,8 @@
       const cipher = node.querySelector('.bubble__cipher');
 
       let unlocked = false;
-      metaAuthor.textContent = entry.sender || 'Peer';
+      const displaySender = localSentIds.has(entry.id) ? 'You' : (entry.sender || 'Peer');
+      metaAuthor.textContent = displaySender;
       metaTime.textContent = fmtTime(entry.at);
 
       if (state.passcode) {
@@ -226,6 +228,7 @@
     updateLockUI();
 
     const encrypted = await encryptMessage(text, code, 'You');
+    localSentIds.add(encrypted.id);
     state.messages.push(encrypted);
     sendToRelay(encrypted);
     messageInput.value = '';
@@ -361,6 +364,12 @@
 
   function wireEvents() {
     messageForm.addEventListener('submit', handleSend);
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        messageForm.requestSubmit();
+      }
+    });
     setCodeButton.addEventListener('click', () => {
       const code = codeInput.value.trim();
       if (!code) return codeInput.focus();
